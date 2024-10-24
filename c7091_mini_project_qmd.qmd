@@ -1,0 +1,258 @@
+---
+title: "c7091_mini_project"
+format: html
+editor: visual
+---
+
+## C7091 Professional Skills for Data Science
+
+*Miss S-J Childs*\
+*Student ID: 24370500*\
+*Mini-Project*\
+*2024-10-23*
+
+```{r setup, include = FALSE}
+# Install necessary packages (if not already installed)
+if (!requireNamespace("tidyverse", quietly = TRUE)) {
+  install.packages("tidyverse")
+}
+if (!requireNamespace("car", quietly = TRUE)) {
+  install.packages("car")
+}
+
+# Load libraries
+library(ggplot2)
+library(dplyr)
+library(car)
+
+
+# Set global options
+knitr::opts_chunk$set(
+  echo = TRUE,      # Show the R code in the output
+  warning = FALSE,  # Hide warnings
+  message = FALSE   # Hide messages
+)
+```
+
+## Background
+
+Over the course of time, crop science has helped develop modern farming practices and a knowledge base of what a crop needs to be healthy and produce a maximum yield. In 1840 von Liebig's *Law of the Minimum* showed nitrogen (N) to be the limiting factor, and since the creation of the *Haber-Bosch* process (1913), followed then by Borlaug's *Green Revolution* (1950s-60s), modern crop varieties have been bred for high-input high-output with a heavy reliance on synthetic N fertiliser (1).
+
+Today, conventional agriculture appears to be rigidly fixed in this industrial extractive mindset. Yet, this approach is heavily based on fossil fuels and has depleted resources, including often one of the most overlooked - our soil (2). Soil is a living biome, rich in microbial life from fungi, protozoa to bacteria. Some bacteria (*Azotobacter*, *Rhizobium* etc) hacked the *Haber-Bosch* process eons ago and can fix their own N. The organic and regenerative agriculture movement concepts of living soil and soil health have begun to shift the paradigm, and sustainable crop production is now influencing scientific research (3).
+
+From this research, advances have included harnessing the biological N fixing (BNF) microbes in biostimulant products, leading to less reliance on synthetic fertilisers. Our project has developed a nanotechnology based BNF product that has the potential to form long-term relationships with the plant. Because the bacteria respond to the presence of certain root exudates (1) they will 'remember' the crop type. There will be a higher net BNF in the soil due to the inoculant durability, benefitting any crops grown again in the same soil.
+
+This trial will evaluate our new Nano BNF against a Regular BNF already in use, with a Control of no input and test our hypotheses.
+
+## Trial Design & Null Hypotheses
+
+The nanotechnology product, referred to as Nano BNF, was tested against a regular biostimulant, Reg BNF, and a control of no treatment on the leguminous plant, soybean (*Glycine max*). The trial was set over two years, 2016 and 2017, over a randomised design, but with the treatments only added in 2016. The plots were thus repeated so as to test the efficacy of product endurance.
+
+Null hypotheses:\
+1st - *The nano treatment will make no difference to the yield in 2016 and 2017 in comparison to the Control and Reg BNF.*\
+2nd - *The plots with the Nano BNF treatment, will have no change in yield from 2016 to 2017.*\
+3rd - *The Reg BNF does not affect the yield any more than the Control.*
+
+## Statistical Methodology
+
+The statistical analysis was conducted in Rstudio with both base R and the tidyverse packages. It is based on null hypothesis significance testing and explores the data, cleaning and manipulating when necessary. It will be described and summarised and the Gaussian assumption tests will involve Shapiro-Wilk, homoscedasticity and Bartlett tests. Each null hypothesis with have a one way ANOVA conducted, followed by a post-hoc TukeyHSD if necessary. The yield is the dependent variable and the treatments the independent variables.
+
+## Results and Discussion
+
+Before discussing the three null and alternative hypotheses, the overall affect of the treatments on yield has been looked at.
+
+```{r initial exploration}
+# Group data by treatment overall and summarise
+treatment_summary <- trial_data %>%
+  group_by(treatment) %>%
+  reframe(
+    range_yield = range(yield),
+    IQR_yield = IQR(yield),
+    mean_yield = mean(yield),
+    median_yield = median(yield),
+    var_yield = var(yield)
+  )
+
+print(treatment_summary)
+
+```
+
+From initial observations it looks like the mean and median yields of the Control and Reg BNF are similar, but the Nano BNF has mean and median higher yields.
+
+#### Assumption Tests
+
+Assumption tests are necessary to see if the data fits Gaussian distribution. The visualisation below shows a positive skew right, so it may be that the data lower boundaries are very low compared to the rest of the data.
+
+```{r assumption tests}
+# Fitting the ANOVA model with trial_data
+trial <- aov(yield ~ treatment, data = trial_data)
+
+# fancy visual check ggplot
+ggplot(trial_data, aes(x = yield)) +
+  geom_histogram(aes(y = after_stat(density)),
+                 bins = 30, fill = "steelblue2", alpha = 0.7) +
+  stat_function(fun = dnorm, args = list(mean = mean(trial_data$yield),
+                 sd = sd(trial_data$yield)), color = "orangered2") +
+  labs(title = " Gaussian?", x = "Yield", y = "Density") 
+```
+
+More formal tests can look at this more closely.
+
+```{r Shapiro test}
+
+## Shapiro-Wilk test 
+
+shapiro_results <- shapiro.test(rstandard(trial))
+
+print(shapiro_results)
+```
+
+The W value, much like a correlation coefficient needs to be close to 1 to indicate "normality", which we do indeed approach. The p value is very low, however, indicating some deviation./ Checking for homoscedasticity can show the consistency of spread for the data points.
+
+```{r homoscedasticity}
+# Plot for homoscedasticity check
+plot(formula = rstandard(trial) ~ fitted(trial),
+     ylab = "trial: residuals",
+     xlab = "trial: fitted values",
+     main = "Spread similar across x?") 
+abline(h = 0,
+       lty = 2, lwd = 2, col = "orange") 
+```
+
+```{r qq plotting}
+qqPlot(x = trial,
+       main = "Gaussian?")
+```
+
+The Q-Q plot reveals how the data does and does not fit. It may be possible that a data transformation process, such as applying log, would assist.
+
+#### ANOVA Visualisation
+
+Looking at an overall ANOVA assessment the effect of the treatments over both years, it can be observed by the boxplots that the Nano BNF has a higher yield than the no input Control or Reg BNF.
+
+```{r graphing anova }
+## Graphing overall ANOVA
+
+ggplot(trial_data, aes(x = treatment, y = yield, fill = treatment)) +
+  geom_boxplot() +
+  geom_hline(yintercept = mean(trial_data$yield), linetype = "dashed", 
+      color = "red", linewidth = 1) +
+  labs(title = "Effect of Treatment Types on Yield",
+       x = "Treatment",
+       y = "Yield") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+#### First Hypothesis
+
+h0 *The nano treatment will make no difference to the yield in 2016 and 2017 in comparison to the Control and Reg BNF*
+
+```{r 1st h0}
+
+H1_data <- trial_data %>%
+  filter(treatment %in% c("Control", "Reg_BNF", "Nano_BNF"))
+
+h1 <- aov(yield ~ treatment + year, data = H1_data) # fitted model
+
+print(summary(h1))
+
+
+# Visual check
+ggplot(trial_data, aes(x = treatment, y = yield, color = as.factor(year))) +
+  stat_summary(fun.data = "mean_cl_boot", geom = "errorbar", width = 0.2, position = position_dodge(0.5)) +
+  stat_summary(fun = mean, geom = "point", size = 3, 
+  position = position_dodge(0.5)) +
+  labs(title = "ANOVA Results: Yield by Treatment and Year", x = "Treatment", y = "Yield", color = "Year") +
+  theme_minimal()
+
+```
+
+The results show that for the effect of treatment on yield the F and p values are highly significant, as is also however the influence of year. It could be suggested that 2016 had the higher yields because of both BNF products being added, when they were not in 2017 - but this does not account for the decline of the yield in the Control. It is not unreasonable to assume that a crop grown in the same plot will utilise the nutrients of that plot, such as N, for growth and if the soil has not the resources or they are not manually replenished, then the yield can diminish in the following year.\
+To be noted, there are a high amount of residuals in the ANOVA table, and the causes of this background noise should be investigated.
+
+Given the evidence the null hypothesis is rejected. A post hoc test is now relevant. Given the high number of variances, a Bonferroni test, although more conservative, should provide some robustness. TukeyHSD is an alternative but works best with similar variances across the groups.
+
+#### *Post hoc*
+
+```{r Bonerroni}
+
+h01 <- pairwise.t.test(x = trial_data$yield, 
+                g = trial_data$treatment,
+                p.adjust.method = "bonferroni")
+print(h01)
+
+```
+
+Between the Control and Reg BNF there is no significant difference in yield, but between the Nano BNF and the Control and the Nano BNF and the Reg BNF there are significant differences. The Nano BNF has had an effect on the yield across both years.
+
+#### Second Hypothesis
+
+h0 *The plots with the Nano BNF treatment, will have no change in yield from 2016 to 2017*
+
+```{r 2nd h0)}
+
+Nano_BNF_data <- trial_data %>% 
+  filter(treatment == "Nano_BNF")
+
+h2 <- aov(yield ~ year, data = Nano_BNF_data) # fitted model
+
+print(summary(h2))
+```
+
+```{r}
+#| label: fig-2nd Hypothesis
+# Visual check
+ggplot(Nano_BNF_data, aes(x = year, y = yield, fill = year)) +
+  geom_boxplot() +
+  labs(title = "Yield for Nano_BNF Treatment by Year",
+       x = "Year", y = "Yield") +
+  theme_minimal()
+```
+
+There is a significance difference between the years and the null hypothesis is rejected. This could infer that the Nano product has not remained active in the soil to create N for the crop, or it has been lost. Many factors affect microbial activity, such as pH, temperature, water logging to soil organic matter content (1).
+
+#### Third Hypothesis
+
+h0 *The Reg BNF does not affect the yield any more than the Control*
+
+```{r 3rd h0}
+
+reg_control_data <- trial_data %>% 
+  filter(treatment %in% c("Reg_BNF", "Control"))
+
+h3 <- aov(yield ~ treatment * year, data = reg_control_data)
+
+print(summary(h3))
+```
+
+```{r}
+# Visual check
+ggplot(reg_control_data, aes(x = treatment, y = yield, 
+      fill = as.factor(year))) +
+  geom_boxplot() +
+  labs(title = "Yield by Treatment and Year",
+       x = "Treatment",
+       y = "Yield",
+       fill = "Year") +
+  theme_minimal()
+```
+
+There is no significant difference between the Control and the Reg BNF treatments; the null hypothesis is not rejected.\
+For the year: F value of 145.269 and p-value of \<2e-16 do indicate a significant difference in yields for 2016 and 2017. So the year appears to have more of an effect on yield than the treatments.
+
+### Conclusion
+
+The Nano BNF does assist in increasing yield in soybean, then compared to no input of a regular BNF, but it has not been proven that it has longevity in the soil to do so again in the second year. The regular BNF makes no significant impact compared to the control. This is a familiar pattern to critics of biostimulants, as the evidence of their effectiveness is heavily dependent on soil types, crop types and environmental conditions (3).
+
+Given how much of the soil life is still not fully understood more research into their long-term effects is needed. Indeed, the role of the soil itself should not be underplayed, as biostimulants risk becoming just another additive applied to poor soil, solely to achieve yield without regarding the wider ecosystem service which conventional agricultural practices have degraded (1).
+
+The trial also had some challenges with the distribution of data and high residuals, which may be ironed in future trials through design, data collection and transformation techniques. It should also be considered if a null hypothesis significance testing approach is always, although very familiar, the best approach to take, given new methods such as Baysian (4, 5).
+
+### References
+
+1)  du Jardin P. Plant biostimulants: Definition, concept, main categories and regulation. 2015. Sci Direct. Available from: https://www.sciencedirect.com/science/article\
+2)  Smercina DN, Evans SE, Friesen ML et al. To fix or not to fix: Controls on Free-Living Nitrogen Fixation in the Rhizosphere. 2019. Available from: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC\
+3)  Paudel, D., Wang, L., Poudel, R. et al. Elucidating the effects of organic vs. conventional cropping practice and rhizobia inoculation on rhizosphere microbial diversity and yield of peanut. Environmental Microbiome. 2021. Available from: https://environmentalmicrobiome.biomedcentral.com/articles\
+4)  Lakens D. Null hypothesis significance testing and effect sizes: can we ‘effect’ everything … or … anything? ScienceDirect. 2017. Available from: https://www.sciencedirect.com/science/article\
+5)  Schmidt-Hebbel H. Problems and alternatives of testing significance using null hypothesis and P-value in food research. 2019. Available from: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC
